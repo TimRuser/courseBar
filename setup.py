@@ -18,10 +18,17 @@ class TimeUtilities():
         if timeStart <= timeNow <= timeEnd:
             return True
 
+    def isEntryNear(self, entry, nHours):
+        timeNow = datetime.datetime.now()
+        timeStart = datetime.datetime(timeNow.year,timeNow.month,timeNow.day,entry[2],entry[3])
+
+        if datetime.timedelta(0) <=(timeStart - timeNow) <= datetime.timedelta(hours = nHours):
+            return True 
+
 
 class Timetable():
     def __init__(self, entries):
-        self.entries = [("A401",2,19,00,21,00), ("A302",2,21,20,22,20), ("A202",3,10,30,11,15)]
+        self.entries = [("A401",2,19,00,20,00), ("A302",2,21,20,22,20), ("A202",3,10,30,11,15)]
 
     def getEntriesToday(self):
         weekday = datetime.datetime.today().weekday()
@@ -63,14 +70,19 @@ class CourseApp(rumps.App):
         # Current course
         self.currentCourseId = "0"
         self.currentEntry = ()
+        # Upcoming course
+        self.upcomingCourseId = "0"
+        self.upcomingEntry = ()
 
         # Opened course
         self.openedCourseId = "0"
 
         # Menu Building
         self.currentCourseMenuItem = rumps.MenuItem("No current course", callback=None)
+        self.upcomingCourseMenuItem = rumps.MenuItem("No upcoming course", callback=None)
         self.menu = [
             self.currentCourseMenuItem,
+            self.upcomingCourseMenuItem,
             "Open Course Notes"
         ]
 
@@ -89,7 +101,6 @@ class CourseApp(rumps.App):
         # Checking for courses if the day changed
         @rumps.timer(60)
         def timerCheck(sender):
-            print("Performed up-to-date check")
             if self.todaysDate.day != datetime.datetime.today().day:
                 for course in self.courseList:
                     courseEntriesToday = self.courseList[course].returnEntriesToday()
@@ -97,11 +108,12 @@ class CourseApp(rumps.App):
                         self.todaysCourses[course] = courseEntriesToday
                 print("Updated today's courses") 
                 self.todaysDate = datetime.datetime.today()
+            print("Performed up-to-date check")
 
-        # Getting current course
+        # Updating current and upcoming courses
         @rumps.timer(10)
         def getCurrentCourse(sender):
-            print("Performed course check")
+            # Checking for current courses
             for course in self.todaysCourses:
                 for entry in self.todaysCourses[course]:
                     if TimeUtilities().isEntryCurrently(entry):
@@ -112,11 +124,31 @@ class CourseApp(rumps.App):
                     print("Updated current course")
                     break
             
-            # Setting the menu
-            if self.currentCourseId != "0":
-                self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5])))
-                self.currentCourseMenuItem.title = self.courseList[self.currentCourseId].name + " in " + self.currentEntry[0]
+            # Checking for upcoming courses
+            for course in self.todaysCourses:
+                for entry in self.todaysCourses[course]:
+                    if TimeUtilities().isEntryNear(entry,2):
+                        self.upcomingCourseId = course
+                        self.upcomingEntry = entry
+                        break
+                if self.upcomingCourseId == course:
+                    print("Updated upcoming course")
+                    break
 
+            # Setting the menu
+            if self.currentCourseId == "0":
+                if self.upcomingCourseId != "0":
+                    self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5]))) + " in " + self.upcomingEntry[0]
+                    self.currentCourseMenuItem = "No current course"
+                    self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name
+            else:
+                self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.upcomingEntry[0]
+                self.currentCourseMenuItem.title = "Now: " + self.courseList[self.currentCourseId].name
+                if self.upcomingCourseId != "0":
+                    self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name
+                
+
+            print("Performed course check")
 
     def openCourse(self, courseId):
         command = 'cd ~/Documents/Notizen/' + self.courseList[courseId].dir + ' && vim test.tex'
