@@ -80,16 +80,26 @@ class CourseApp(rumps.App):
         self.todaysCourses = {}
 
         # Loading configuration
-        self.configWatcher = None
         self.configPath = os.path.abspath('config.json')
+        print("Config path set to ", self.configPath)
         self.loadConfig(initial=True) 
+
+        # Starting configuration watchdog
+        eventHandler = ConfigFileHandler(self.configPath, self.loadConfig)
+        observer = Observer()
+        observer.schedule(eventHandler, path=os.path.dirname(self.configPath), recursive=False)
+        observer.start()
+
+        self.configWatcher = observer
+
+        print("Started config watchdog")
 
         # Menu Building
         self.currentCourseMenuItem = rumps.MenuItem(self.noCurrentCourseTitle, callback=None)
         self.upcomingCourseMenuItem = rumps.MenuItem(self.noUpcomingCourseTitle, callback=None)
 
         self.openCourseMenuItems = {
-            "0": rumps.MenuItem(title="None", callback=self.selectingCourseToOpen),
+            "0": rumps.MenuItem(title="None", callback=self.selectingCourseNotesToOpen),
         }
 
         self.menu = [
@@ -108,11 +118,11 @@ class CourseApp(rumps.App):
         # Adding open course notes options
         self.menu["Open Course Notes"].add(self.openCourseMenuItems["0"])
         for course in self.courseList:
-            item = rumps.MenuItem(title=self.courseList[course].name, callback=self.selectingCourseToOpen)
+            item = rumps.MenuItem(title=self.courseList[course].name, callback=self.selectingCourseNotesToOpen)
             self.menu["Open Course Notes"].add(item)
             self.openCourseMenuItems[course] = item
 
-        self.selectingCourseToOpen(None)
+        self.selectingCourseNotesToOpen(None)
         
 
         # Opening timetable 
@@ -130,20 +140,9 @@ class CourseApp(rumps.App):
             # Open default editor for .json
             subprocess.call(('open', self.configPath))
 
-            # Start watchdog for config.json file
-            if self.configWatcher != None:
-                self.configWatcher.stop()
-                self.configWatcher.join()
-            event_handler = ConfigFileHandler(self.configPath, self.loadConfig)
-            observer = Observer()
-            observer.schedule(event_handler, path=os.path.dirname(self.configPath), recursive=False)
-            observer.start()
+            # Open finder to folder
+            subprocess.call(["open", "-R", 'timetable.pdf'])
 
-            self.configWatcher = observer
-
-            print("Started config watchdog")
-
-        
         # Checking for courses if the day changed
         @rumps.timer(120)
         def checkIfCoursesFromToday(sender):
@@ -158,7 +157,7 @@ class CourseApp(rumps.App):
 
 
     def loadConfig(self, initial=False):
-        with open(self.configPath, 'r') as f:
+        with open(self.configPath, 'r', encoding='utf-8') as f:
             config = json.load(f)        
 
         self.noCurrentCourseTitle = config['defaultCurrentTitle']
@@ -182,13 +181,6 @@ class CourseApp(rumps.App):
                 self.currentCourseMenuItem = self.noCurrentCourseTitle
                 self.upcomingCourseMenuItem = self.noUpcomingCourseTitle
         
-    def watchConfigFile(configPath, callback):
-        event_handler = ConfigFileHandler(configPath, callback)
-        observer = Observer()
-        observer.schedule(event_handler, path=os.path.dirname(configPath), recursive=False)
-        observer.start()
-        return observer
-
     # Functions for updating course display
     def updateTodaysCourses(self):
         self.todaysCourses = {}
@@ -239,7 +231,7 @@ class CourseApp(rumps.App):
             
         print("Checked current and upcoming courses")
 
-    def openCourse(self, courseId):
+    def openCourseNotes(self, courseId):
         command = 'cd ~/Documents/Notizen/' + self.courseList[courseId].dir + ' && vim main.tex'
         apple_script = f'''
         tell application "iTerm"
@@ -253,28 +245,28 @@ class CourseApp(rumps.App):
         '''
         subprocess.run(["osascript", "-e", apple_script])
 
-    def closeCourse(self):
+    def closeCourseNotes(self):
         script = 'tell application "iTerm" to close current window'
         subprocess.run(["osascript", "-e", script])
 
         script = 'tell application "Skim" to close every window'
         subprocess.run(["osascript", "-e", script])
 
-    def selectingCourseToOpen(self, sender):
+    def selectingCourseNotesToOpen(self, sender):
         if sender == None or sender.title == "None":
-            self.openingCourse("0")
+            self.openingCourseNotes("0")
         else:
             for i in range(1,len(self.courseList)):
                 if sender.title == self.courseList[str(i)].name:
                     courseId = str(i)
-                    self.openingCourse(courseId)
+                    self.openingCourseNotes(courseId)
                     break
 
-    def openingCourse(self, courseId):
+    def openingCourseNotes(self, courseId):
         if int(self.openedCourseId) > 0:
-            self.closeCourse()
+            self.closeCourseNotes()
         if int(courseId) > 0:
-            self.openCourse(courseId)
+            self.openCourseNotes(courseId)
         self.openedCourseId = courseId
         if courseId != "0":
             for name, item in self.openCourseMenuItems.items():

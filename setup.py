@@ -9,13 +9,16 @@ from setuptools import setup
 
 OPTIONS = {
     'packages': ['rumps', 'json', 'subprocess', 'datetime'],
-    'iconfile': 'studybar.icns'
+    'iconfile': 'studybar.icns',
+    'plist': {
+        'LSUIElement': True,
+    },
 }
 
 setup(
     name="StudyBar",
     app=["studyBar.py"],
-    data_files=["config.json"],
+    data_files=["config.json", "timetable.pdf"],
     options={"py2app": OPTIONS},
     setup_requires=["py2app"],
 )
