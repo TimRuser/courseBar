@@ -3,6 +3,7 @@ import subprocess
 import datetime
 import json
 import os
+import webbrowser
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -94,13 +95,17 @@ class CourseApp(rumps.App):
         self.menu = [
             self.currentCourseMenuItem,
             self.upcomingCourseMenuItem,
+            rumps.separator,
             "Open Course Notes",
+            rumps.separator,
+            "Show timetable",
             "Open Settings"
         ]
 
-        # Today's data
+        # Today's date
         self.todaysDate = datetime.datetime.today() - datetime.timedelta(days = 1)
 
+        # Adding open course notes options
         self.menu["Open Course Notes"].add(self.openCourseMenuItems["0"])
         for course in self.courseList:
             item = rumps.MenuItem(title=self.courseList[course].name, callback=self.selectingCourseToOpen)
@@ -110,7 +115,15 @@ class CourseApp(rumps.App):
         self.selectingCourseToOpen(None)
         
 
-        # Opening settings window
+        # Opening timetable 
+        @rumps.clicked("Show timetable")
+        def openTimetable(sender):
+            if os.path.isfile('timetable.pdf'):
+                print("Opening timetable")
+                # Open pdf in the browser
+                webbrowser.open_new(r'file://' + os.path.abspath('timetable.pdf'))
+
+        # Opening config
         @rumps.clicked("Open Settings")
         def openSettings(sender):
             print("Opening settings")
@@ -210,17 +223,17 @@ class CourseApp(rumps.App):
 
         # Setting the menu
         if self.currentCourseId == "0":
-            self.currentCourseMenuItem = self.noCurrentCourseTitle
+            self.currentCourseMenuItem.title = self.noCurrentCourseTitle
             if self.upcomingCourseId != "0":
-                self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5]))) + " in " + self.upcomingEntry[0]
-                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5])))
+                self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[3]) + ":" + (str(self.upcomingEntry[4]) if self.upcomingEntry[4] > 9 else ("0" + str(self.upcomingEntry[4]))) + " in " + self.upcomingEntry[0]
+                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[2]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
             else:
                 self.upcomingCourseMenuItem = self.noUpcomingCourseTitle
         else:
             self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.currentEntry[0]
             self.currentCourseMenuItem.title = "Now: " + self.courseList[self.currentCourseId].name
             if self.upcomingCourseId != "0":
-                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5])))
+                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
             else:
                 self.upcomingCourseMenuItem.title = self.noUpcomingCourseTitle
             

@@ -3,24 +3,103 @@
     "defaultUpcomingTitle": "No upcoming course",
     "hoursIsNear": 2,
     "Courses": [
-        {
-            "name": "Mathematik Grundlagen",
-            "shortName": "M",
-            "directory": "MK4/Grundlagen",
-            "entries": [
-                ["403", 1, 20, 0, 21, 0],
-                ["405", 3, 16, 0, 17, 14],
-                ["405", 5, 8, 0, 9, 0]
-            ]
-        },
-        {
-            "name": "Deutsch",
-            "shortName": "D",
-            "directory": "DK4/Faust",
-            "entries":[
-                ["A05", 3, 18, 0, 18, 30],
-                ["F001", 2, 9, 0, 10, 0]
-            ]
-        }
+      {
+        "name": "Anwendungen der Mathematik",
+        "shortName": "sM",
+        "directory": "",
+        "entries": [
+          ["A411", 0, 7, 45, 9, 20],
+          ["F004", 0, 10, 30, 11, 15]
+        ]
+      },
+      {
+        "name": "Mathematik",
+        "shortName": "M",
+        "directory": "",
+        "entries": [
+          ["A411", 0, 11, 20, 12, 5],
+          ["F004", 1, 11, 20, 12, 5],
+          ["F_R1", 3, 9, 40, 11, 15]
+        ]
+      },
+      {
+        "name": "Französisch",
+        "shortName": "F",
+        "directory": "",
+        "entries": [
+          ["A402", 0, 9, 40, 11, 15],
+          ["27", 2, 10, 30, 11, 15]
+        ]
+      },
+      {
+        "name": "Deutsch",
+        "shortName": "D",
+        "directory": "",
+        "entries": [
+          ["F004", 1, 9, 40, 10, 25],
+          ["G403", 4, 9, 40, 12, 5]
+        ]
+      },
+      {
+        "name": "Englisch",
+        "shortName": "E",
+        "directory": "",
+        "entries": [
+          ["39", 2, 9, 40, 10, 25],
+          ["F_R1", 3, 7, 45, 9, 20]
+        ]
+      },
+      {
+        "name": "Physik",
+        "shortName": "P",
+        "directory": "",
+        "entries": [
+          ["P005", 1, 13, 35, 15, 10]
+        ]
+      },
+      {
+        "name": "Sport",
+        "shortName": "SPO",
+        "directory": "",
+        "entries": [
+          ["S2", 1, 15, 25, 16, 10],
+          ["S1", 2, 13, 35, 15, 10]
+        ]
+      },
+      {
+        "name": "Physik Schwerpunkt",
+        "shortName": "sP",
+        "directory": "",
+        "entries": [
+          ["P001", 2, 7, 45, 9, 20],
+          ["P001", 2, 11, 20, 12, 5]
+        ]
+      },
+      {
+        "name": "Psychologie",
+        "shortName": "efPPA",
+        "directory": "",
+        "entries": [
+          ["F001", 1, 7, 45, 9, 20],
+          ["39", 4, 13, 30, 17, 0]
+        ]
+      },
+      {
+        "name": "Geschichte",
+        "shortName": "G",
+        "directory": "",
+        "entries": [
+          ["G405", 4, 7, 45, 9, 40]
+        ]
+      },
+      {
+        "name": "Klassenstunde",
+        "shortName": "KLA",
+        "directory": "",
+        "entries": [
+          ["G403", 4, 12, 5, 12, 50]
+        ]
+      }
     ]
-}
+  }
+  
