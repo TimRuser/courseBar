@@ -7,14 +7,15 @@ Usage:
 
 from setuptools import setup
 
-plist = {
-
+OPTIONS = {
+    'packages': ['rumps', 'json', 'subprocess', 'datetime'],
+    'iconfile': 'studybar.icns'
 }
 
 setup(
-    name="studyBar",
+    name="StudyBar",
     app=["studyBar.py"],
-    # data_files=[""],
-    options={"py2app": {"plist": plist}},
-    setup_requires=["py2app", "pyobjc-framework-Cocoa"],
+    data_files=["config.json"],
+    options={"py2app": OPTIONS},
+    setup_requires=["py2app"],
 )

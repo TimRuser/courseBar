@@ -1,6 +1,19 @@
 import rumps
 import subprocess
 import datetime
+import json
+import os
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+class ConfigFileHandler(FileSystemEventHandler):
+    def __init__(self, file_to_watch, onChangeCallback):
+        self.fileToWatch = os.path.abspath(file_to_watch)
+        self.onChangeCallback = onChangeCallback
+
+    def on_modified(self, event):
+        if os.path.abspath(event.src_path) == self.fileToWatch:
+            self.onChangeCallback()
 
 class TimeUtilities():
     def isEntryToday(self, entry):
@@ -55,35 +68,30 @@ class CourseApp(rumps.App):
     def __init__(self):
         super(CourseApp, self).__init__(name="Course")
 
-        # Set default course
-        self.noCourseTitle = "No current course"
-        self.title = self.noCourseTitle
-
-        # List of all courses
-        self.courseList = {
-            "1": Course(1, 'Mathe Grundlagen','M',[("A302",3,21,20,22,20), ("A202",3,7,30,11,15)],'MK4/Grundlagen'),
-            "2": Course(2, 'Deutsch', 'de',[("A401",3,10,00,20,00)],'DK4')
-        }
-        self.openCourseMenuItems = {
-            "0": rumps.MenuItem(title="None", callback=self.selectingCourseToOpen),
-        }
-
-        # Current course
+        # Setting default values
         self.currentCourseId = "0"
         self.currentEntry = ()
-        # Upcoming course
         self.upcomingCourseId = "0"
         self.upcomingEntry = ()
 
-        # Opened course
         self.openedCourseId = "0"
+        
+        self.todaysCourses = {}
 
-        # Settings window
-        self.settingsWindow = None
+        # Loading configuration
+        self.timeConfigWatcherEnabled = None
+        self.configWatcher = None
+        self.configPath = os.path.abspath('config.json')
+        self.loadConfig() 
 
         # Menu Building
         self.currentCourseMenuItem = rumps.MenuItem("No current course", callback=None)
         self.upcomingCourseMenuItem = rumps.MenuItem("No upcoming course", callback=None)
+
+        self.openCourseMenuItems = {
+            "0": rumps.MenuItem(title="None", callback=self.selectingCourseToOpen),
+        }
+
         self.menu = [
             self.currentCourseMenuItem,
             self.upcomingCourseMenuItem,
@@ -93,7 +101,6 @@ class CourseApp(rumps.App):
 
         # Today's data
         self.todaysDate = datetime.datetime.today() - datetime.timedelta(days = 1)
-        self.todaysCourses = {}
 
         self.menu["Open Course Notes"].add(self.openCourseMenuItems["0"])
         for course in self.courseList:
@@ -107,57 +114,117 @@ class CourseApp(rumps.App):
         # Opening settings window
         @rumps.clicked("Open Settings")
         def openSettings(sender):
-            pass
+            print("Opening settings")
+            # Open default editor for .json
+            subprocess.call(('open', self.configPath))
+
+            # Start watchdog for config.json file
+            if self.configWatcher != None:
+                self.configWatcher.stop()
+                self.configWatcher.join()
+            event_handler = ConfigFileHandler(self.configPath, self.loadConfig)
+            observer = Observer()
+            observer.schedule(event_handler, path=os.path.dirname(self.configPath), recursive=False)
+            observer.start()
+
+            self.timeConfigWatcherEnabled = datetime.datetime.now()
+            self.configWatcher = observer
+
+            print("Started config watchdog")
+
+        @rumps.timer(1200)
+        def checkWatcher(sender):
+            # Check if watchdog is active and deactivate it if it has been active more than 20 minutes since start
+            if self.configWatcher != None:
+                if (datetime.datetime.now() - self.timeConfigWatcherEnabled) >= datetime.timedelta(minutes=20):
+                    self.configWatcher.stop()
+                    self.configWatcher.join()
+                    self.configWatcher = None
+                    self.timeConfigWatcherEnabled = None
+                    print("Deactivated config watchdog")
 
         # Checking for courses if the day changed
         @rumps.timer(120)
-        def timerCheck(sender):
+        def checkIfCoursesFromToday(sender):
             if self.todaysDate.day != datetime.datetime.today().day:
-                for course in self.courseList:
-                    courseEntriesToday = self.courseList[course].returnEntriesToday()
-                    if len(courseEntriesToday) > 0:
-                        self.todaysCourses[course] = courseEntriesToday
-                print("Updated today's courses") 
+                self.updateTodaysCourses()    
                 self.todaysDate = datetime.datetime.today()
             print("Performed up-to-date check")
 
-        # Updating current and upcoming courses
         @rumps.timer(30)
-        def getCurrentCourse(sender):
-            # Checking for current courses
-            for course in self.todaysCourses:
-                for entry in self.todaysCourses[course]:
-                    if TimeUtilities().isEntryCurrently(entry):
-                        self.currentCourseId = course
-                        self.currentEntry = entry
-                        break
-                if self.currentCourseId == course:
+        def callCheckCourses(sender):
+            self.updateCurrentCourses()
+
+
+    def loadConfig(self):
+        with open(self.configPath, 'r') as f:
+            config = json.load(f)        
+
+        self.noCourseTitle = config['defaultTitle']
+        self.title = self.noCourseTitle
+        self.hIsNear = config['hoursIsNear']
+
+        # Load courses
+        self.courseList = {}
+        for i in range(1,len(config['Courses']) + 1):
+            course = config['Courses'][i-1]
+            self.courseList[str(i)] = Course(i, course['name'], course['shortName'],course['entries'],course['directory'])
+
+        print("Config was loaded")
+
+        if len(self.todaysCourses) > 0:
+            self.updateTodaysCourses()
+            self.updateCurrentCourses()
+        
+    def watchConfigFile(configPath, callback):
+        event_handler = ConfigFileHandler(configPath, callback)
+        observer = Observer()
+        observer.schedule(event_handler, path=os.path.dirname(configPath), recursive=False)
+        observer.start()
+        return observer
+
+    def updateTodaysCourses(self):
+        for course in self.courseList:
+            courseEntriesToday = self.courseList[course].returnEntriesToday()
+            if len(courseEntriesToday) > 0:
+                self.todaysCourses[course] = courseEntriesToday
+        print("Updated today's courses") 
+
+
+    def updateCurrentCourses(self):
+        # Checking for current courses
+        for course in self.todaysCourses:
+            for entry in self.todaysCourses[course]:
+                if TimeUtilities().isEntryCurrently(entry):
+                    self.currentCourseId = course
+                    self.currentEntry = entry
                     break
+            if self.currentCourseId == course:
+                break
+        
+        # Checking for upcoming courses
+        for course in self.todaysCourses:
+            for entry in self.todaysCourses[course]:
+                if TimeUtilities().isEntryNear(entry,self.hIsNear):
+                    self.upcomingCourseId = course
+                    self.upcomingEntry = entry
+                    break
+            if self.upcomingCourseId == course:
+                break
+
+        # Setting the menu
+        if self.currentCourseId == "0":
+            if self.upcomingCourseId != "0":
+                self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5]))) + " in " + self.upcomingEntry[0]
+                self.currentCourseMenuItem = "No current course"
+                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5])))
+        else:
+            self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.currentEntry[0]
+            self.currentCourseMenuItem.title = "Now: " + self.courseList[self.currentCourseId].name
+            if self.upcomingCourseId != "0":
+                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5])))
             
-            # Checking for upcoming courses
-            for course in self.todaysCourses:
-                for entry in self.todaysCourses[course]:
-                    if TimeUtilities().isEntryNear(entry,2):
-                        self.upcomingCourseId = course
-                        self.upcomingEntry = entry
-                        break
-                if self.upcomingCourseId == course:
-                    break
-
-            # Setting the menu
-            if self.currentCourseId == "0":
-                if self.upcomingCourseId != "0":
-                    self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5]))) + " in " + self.upcomingEntry[0]
-                    self.currentCourseMenuItem = "No current course"
-                    self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5])))
-            else:
-                self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.currentEntry[0]
-                self.currentCourseMenuItem.title = "Now: " + self.courseList[self.currentCourseId].name
-                if self.upcomingCourseId != "0":
-                    self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[4]) + ":" + (str(self.upcomingEntry[5]) if self.upcomingEntry[5] > 9 else ("0" + str(self.upcomingEntry[5])))
-                
-
-            print("Checked current and upcoming courses")
+        print("Checked current and upcoming courses")
 
     def openCourse(self, courseId):
         command = 'cd ~/Documents/Notizen/' + self.courseList[courseId].dir + ' && vim main.tex'
@@ -200,6 +267,8 @@ class CourseApp(rumps.App):
             for name, item in self.openCourseMenuItems.items():
                 item.state = int(name == courseId)
         else:
+            for name, item in self.openCourseMenuItems.items():
+                item.state = False
             self.openCourseMenuItems["0"].state = True
 
 
