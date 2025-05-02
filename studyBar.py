@@ -47,6 +47,22 @@ class TimeUtilities():
 
         return timeEnd - timeNow
 
+    def getEarlierEntry(self,entry1,entry2):
+        if entry1 == None:
+            return entry2
+        elif entry2 == None:
+            return entry1
+
+        timeNow = datetime.datetime.now()
+        timeStart1 = datetime.datetime(timeNow.year,timeNow.month,timeNow.day,entry1[2],entry1[3])
+        timeStart2 = datetime.datetime(timeNow.year,timeNow.month,timeNow.day,entry2[2],entry2[3])
+
+        if (timeStart1 - timeStart2) <= datetime.timedelta(0):
+            return entry1
+        else:
+            return entry2
+        
+
     def convertMinutesToHourMinutes(self, minutes):
         hours = math.floor(minutes / 60)
         minutes = minutes - (hours * 60)
@@ -216,14 +232,17 @@ class CourseApp(rumps.App):
         
         # Checking for upcoming courses
         self.upcomingCourseId = "0"
+        soonestCourseId = "0"
+        soonestEntry = None
         for course in self.todaysCourses:
             for entry in self.todaysCourses[course]:
                 if TimeUtilities().isEntryNear(entry,self.hIsNear):
-                    self.upcomingCourseId = course
-                    self.upcomingEntry = entry
+                    if TimeUtilities().getEarlierEntry(entry,soonestEntry) == entry:
+                        soonestEntry = entry
+                        soonestCourseId = course
                     break
-            if self.upcomingCourseId == course:
-                break
+        self.upcomingCourseId = soonestCourseId
+        self.upcomingEntry = soonestEntry
 
         # Setting the menu
         if self.currentCourseId == "0":
