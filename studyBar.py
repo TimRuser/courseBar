@@ -1,6 +1,7 @@
 import rumps
 import subprocess
 import datetime
+import math
 import json
 import os
 import webbrowser
@@ -39,6 +40,17 @@ class TimeUtilities():
         if datetime.timedelta(0) <=(timeStart - timeNow) <= datetime.timedelta(hours = nHours):
             if not self.isEntryCurrently(entry):
                 return True 
+
+    def getTimeLeft(self, entry):
+        timeNow = datetime.datetime.now()
+        timeEnd = datetime.datetime(timeNow.year,timeNow.month,timeNow.day,entry[4],entry[5])
+
+        return timeEnd - timeNow
+
+    def convertMinutesToHourMinutes(self, minutes):
+        hours = math.floor(minutes / 60)
+        minutes = minutes - (hours * 60)
+        return hours, minutes
 
 
 class Timetable():
@@ -223,7 +235,12 @@ class CourseApp(rumps.App):
                 self.upcomingCourseMenuItem = self.noUpcomingCourseTitle
         else:
             self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.currentEntry[0]
-            self.currentCourseMenuItem.title = "Now: " + self.courseList[self.currentCourseId].name
+            hoursLeft, minutesLeft = TimeUtilities().convertMinutesToHourMinutes(round(TimeUtilities().getTimeLeft(self.currentEntry).seconds / 60))
+            if hoursLeft > 0:
+                self.currentCourseMenuItem.title = str(hoursLeft) + ":" + (str(minutesLeft) if minutesLeft > 9 else ("0" + str(minutesLeft))) + "h left of " + self.courseList[self.currentCourseId].name
+            else:
+                self.currentCourseMenuItem.title = str(minutesLeft) + "min left of " + self.courseList[self.currentCourseId].name
+
             if self.upcomingCourseId != "0":
                 self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
             else:
