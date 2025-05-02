@@ -1,7 +1,7 @@
 {
     "defaultCurrentTitle": "No current course",
     "defaultUpcomingTitle": "No upcoming course",
-    "hoursIsNear": 2,
+    "hoursIsNear": 4,
     "Courses": [
       {
         "name": "Anwendungen der Mathematik",

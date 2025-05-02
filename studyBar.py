@@ -230,9 +230,6 @@ class CourseApp(rumps.App):
             self.currentCourseMenuItem.title = self.noCurrentCourseTitle
             if self.upcomingCourseId != "0":
                 self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3]))) + " in " + self.upcomingEntry[0]
-                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
-            else:
-                self.upcomingCourseMenuItem = self.noUpcomingCourseTitle
         else:
             self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.currentEntry[0]
             hoursLeft, minutesLeft = TimeUtilities().convertMinutesToHourMinutes(round(TimeUtilities().getTimeLeft(self.currentEntry).seconds / 60))
@@ -241,11 +238,11 @@ class CourseApp(rumps.App):
             else:
                 self.currentCourseMenuItem.title = str(minutesLeft) + "min left of " + self.courseList[self.currentCourseId].name
 
-            if self.upcomingCourseId != "0":
-                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
-            else:
-                self.upcomingCourseMenuItem.title = self.noUpcomingCourseTitle
-            
+        if self.upcomingCourseId != "0":
+            self.upcomingCourseMenuItem.title = self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3]))) + " in " + self.upcomingEntry[0]
+        else:
+            self.upcomingCourseMenuItem.title = self.noUpcomingCourseTitle
+        
         print("Checked current and upcoming courses")
 
     def openCourseNotes(self, courseId):
