@@ -217,8 +217,8 @@ class CourseApp(rumps.App):
         if self.currentCourseId == "0":
             self.currentCourseMenuItem.title = self.noCurrentCourseTitle
             if self.upcomingCourseId != "0":
-                self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[3]) + ":" + (str(self.upcomingEntry[4]) if self.upcomingEntry[4] > 9 else ("0" + str(self.upcomingEntry[4]))) + " in " + self.upcomingEntry[0]
-                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[2]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
+                self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3]))) + " in " + self.upcomingEntry[0]
+                self.upcomingCourseMenuItem.title = "Soon: " + self.courseList[self.upcomingCourseId].name + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3])))
             else:
                 self.upcomingCourseMenuItem = self.noUpcomingCourseTitle
         else:
