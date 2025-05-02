@@ -1,4 +1,5 @@
 {
+    "notesPath": "~/Documents/Notizen",
     "defaultCurrentTitle": "No current course",
     "defaultUpcomingTitle": "No upcoming course",
     "hoursIsNear": 4,
@@ -15,7 +16,7 @@
       {
         "name": "Mathematik",
         "shortName": "M",
-        "directory": "",
+        "directory": "MK4/Grundlagen/",
         "entries": [
           ["A411", 0, 11, 20, 12, 5],
           ["F004", 1, 11, 20, 12, 5],

@@ -4,9 +4,12 @@ import datetime
 import math
 import json
 import os
+import re
+from pathlib import Path
 import webbrowser
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from TexSoup import TexSoup, TexNode
 
 class ConfigFileHandler(FileSystemEventHandler):
     def __init__(self, file_to_watch, onChangeCallback):
@@ -103,9 +106,9 @@ class CourseApp(rumps.App):
         self.upcomingCourseId = "0"
         self.upcomingEntry = ()
 
-        self.openedCourseId = "0"
-        
         self.todaysCourses = {}
+
+        self.lessonFilePattern = re.compile(r'^les_\d{2}\.tex$')
 
         # Loading configuration
         self.configPath = os.path.abspath('config.json')
@@ -126,50 +129,13 @@ class CourseApp(rumps.App):
         self.currentCourseMenuItem = rumps.MenuItem(self.noCurrentCourseTitle, callback=None)
         self.upcomingCourseMenuItem = rumps.MenuItem(self.noUpcomingCourseTitle, callback=None)
 
-        self.openCourseMenuItems = {
-            "0": rumps.MenuItem(title="None", callback=self.selectingCourseNotesToOpen),
-        }
+        self.openCourseMenuItems = {}
+        self.createLectureNoteItems = {}
 
-        self.menu = [
-            self.currentCourseMenuItem,
-            self.upcomingCourseMenuItem,
-            rumps.separator,
-            "Open Course Notes",
-            rumps.separator,
-            "Show timetable",
-            "Open Settings"
-        ]
+        self.makeMenu()
 
         # Today's date
         self.todaysDate = datetime.datetime.today() - datetime.timedelta(days = 1)
-
-        # Adding open course notes options
-        self.menu["Open Course Notes"].add(self.openCourseMenuItems["0"])
-        for course in self.courseList:
-            item = rumps.MenuItem(title=self.courseList[course].name, callback=self.selectingCourseNotesToOpen)
-            self.menu["Open Course Notes"].add(item)
-            self.openCourseMenuItems[course] = item
-
-        self.selectingCourseNotesToOpen(None)
-        
-
-        # Opening timetable 
-        @rumps.clicked("Show timetable")
-        def openTimetable(sender):
-            if os.path.isfile('timetable.pdf'):
-                print("Opening timetable")
-                # Open pdf in the browser
-                webbrowser.open_new(r'file://' + os.path.abspath('timetable.pdf'))
-
-        # Opening config
-        @rumps.clicked("Open Settings")
-        def openSettings(sender):
-            print("Opening settings")
-            # Open default editor for .json
-            subprocess.call(('open', self.configPath))
-
-            # Open finder to folder
-            subprocess.call(["open", "-R", 'timetable.pdf'])
 
         # Checking for courses if the day changed
         @rumps.timer(120)
@@ -192,6 +158,7 @@ class CourseApp(rumps.App):
         self.noUpcomingCourseTitle = config['defaultUpcomingTitle']
         self.title = self.noCurrentCourseTitle
         self.hIsNear = config['hoursIsNear']
+        self.notesPath = config['notesPath']
 
         # Load courses
         self.courseList = {}
@@ -206,8 +173,8 @@ class CourseApp(rumps.App):
             if len(self.todaysCourses) > 0:
                 self.updateCurrentCourses()
             else:
-                self.currentCourseMenuItem = self.noCurrentCourseTitle
-                self.upcomingCourseMenuItem = self.noUpcomingCourseTitle
+                self.currentCourseMenuItem.title = self.noCurrentCourseTitle
+                self.upcomingCourseMenuItem.title = self.noUpcomingCourseTitle
         
     # Functions for updating course display
     def updateTodaysCourses(self):
@@ -249,6 +216,8 @@ class CourseApp(rumps.App):
             self.currentCourseMenuItem.title = self.noCurrentCourseTitle
             if self.upcomingCourseId != "0":
                 self.title = self.courseList[self.upcomingCourseId].shortName + " at " + str(self.upcomingEntry[2]) + ":" + (str(self.upcomingEntry[3]) if self.upcomingEntry[3] > 9 else ("0" + str(self.upcomingEntry[3]))) + " in " + self.upcomingEntry[0]
+            else:
+                self.title = self.noCurrentCourseTitle
         else:
             self.title = self.courseList[self.currentCourseId].shortName + " until " + str(self.currentEntry[4]) + ":" + (str(self.currentEntry[5]) if self.currentEntry[5] > 9 else ("0" + str(self.currentEntry[5]))) + " in " + self.currentEntry[0]
             hoursLeft, minutesLeft = TimeUtilities().convertMinutesToHourMinutes(round(TimeUtilities().getTimeLeft(self.currentEntry).seconds / 60))
@@ -262,52 +231,168 @@ class CourseApp(rumps.App):
         else:
             self.upcomingCourseMenuItem.title = self.noUpcomingCourseTitle
         
+        # Add files to current course menu
+        if self.currentCourseId != "0":
+            directory = Path(os.path.join(self.notesPath, self.courseList[self.currentCourseId].dir)).expanduser()
+            openCourseNotes = rumps.MenuItem("Open Course Note")
+            newLectureNote = rumps.MenuItem("New Lecture Note", callback=self.currentWrapperCreateLectureNote)
+            for file in [f.name for f in directory.iterdir() if f.is_file() and f.suffix == '.tex']:
+                openCourseNotes.add(rumps.MenuItem(title=file, callback=self.currentWrapperOpenCourseNotes))
+            self.currentCourseMenuItem.add(openCourseNotes)
+            self.currentCourseMenuItem.add(newLectureNote)
+        else:
+            if len(self.currentCourseMenuItem.items()) > 0:
+                self.currentCourseMenuItem.clear()
+
+        # Add files to upcoming course menu
+        if self.upcomingCourseId != "0":
+            directory = Path(os.path.join(self.notesPath, self.courseList[self.upcomingCourseId].dir)).expanduser()
+            openCourseNotes = rumps.MenuItem("Open Course Note")
+            newLectureNote = rumps.MenuItem("New Lecture Note", callback=self.upcomingWrapperCreateLectureNote)
+            for file in [f.name for f in directory.iterdir() if f.is_file() and f.suffix == '.tex']:
+                openCourseNotes.add(rumps.MenuItem(title=file, callback=self.upcomingWrapperOpenCourseNotes))
+            self.upcomingCourseMenuItem.add(openCourseNotes)
+            self.upcomingCourseMenuItem.add(newLectureNote)
+        else:
+            if len(self.upcomingCourseMenuItem.items()) > 0:
+                self.upcomingCourseMenuItem.clear()
+
+        self.makeMenu()
         print("Checked current and upcoming courses")
 
-    def openCourseNotes(self, courseId):
-        command = 'cd ~/Documents/Notizen/' + self.courseList[courseId].dir + ' && vim main.tex'
-        apple_script = f'''
-        tell application "iTerm"
-            create window with default profile
-            tell current session of current window
-                write text "{command}"
-                delay 1
-                write text ":VimtexCompile"
-            end tell
-        end tell
-        '''
-        subprocess.run(["osascript", "-e", apple_script])
+    def makeMenu(self):
+        if self.menu != None:
+            self.menu.clear()
 
-    def closeCourseNotes(self):
-        script = 'tell application "iTerm" to close current window'
-        subprocess.run(["osascript", "-e", script])
+        self.menu = [
+            self.currentCourseMenuItem,
+            self.upcomingCourseMenuItem,
+            rumps.separator,
+            "Open Course Notes",
+            "New Lecture Note",
+            rumps.separator,
+            rumps.MenuItem("Show timetable", callback=self.openTimetable),
+            rumps.MenuItem("Open Settings", callback=self.openSettings),
+        ]
+        # Adding open course notes options
+        for course in self.courseList:
+            item = rumps.MenuItem(title=self.courseList[course].name, callback=self.openCourseNotes)
+            self.menu["Open Course Notes"].add(item)
+            self.openCourseMenuItems[course] = item
+        # Adding create lecture note options
+        for course in self.courseList:
+            item = rumps.MenuItem(title=self.courseList[course].name, callback=self.createLectureNote)
+            self.menu["New Lecture Note"].add(item)
+            self.createLectureNoteItems[course] = item
+        
+    # Open course note functions
+    def currentWrapperOpenCourseNotes(self, sender):
+        self.openCourseNotes(None, self.currentCourseId, sender.title)
 
-        script = 'tell application "Skim" to close every window'
-        subprocess.run(["osascript", "-e", script])
+    def upcomingWrapperOpenCourseNotes(self, sender):
+        self.openCourseNotes(None, self.upcomingCourseId, sender.title)
 
-    def selectingCourseNotesToOpen(self, sender):
-        if sender == None or sender.title == "None":
-            self.openingCourseNotes("0")
-        else:
+    def openCourseNotes(self, sender, courseId = None, fileName = None):
+        if courseId == None:
             for i in range(1,len(self.courseList)):
                 if sender.title == self.courseList[str(i)].name:
                     courseId = str(i)
-                    self.openingCourseNotes(courseId)
                     break
-
-    def openingCourseNotes(self, courseId):
-        if int(self.openedCourseId) > 0:
-            self.closeCourseNotes()
-        if int(courseId) > 0:
-            self.openCourseNotes(courseId)
-        self.openedCourseId = courseId
-        if courseId != "0":
-            for name, item in self.openCourseMenuItems.items():
-                item.state = int(name == courseId)
+        if fileName == None:
+            self.openingCourseNote(courseId)
         else:
-            for name, item in self.openCourseMenuItems.items():
-                item.state = False
-            self.openCourseMenuItems["0"].state = True
+            self.openingCourseNote(courseId, fileName)
+
+    def openingCourseNote(self, courseId, fileName = None):
+        if fileName == None:
+            command = 'cd ' + os.path.join(self.notesPath, self.courseList[courseId].dir)
+            apple_script = f'''
+            tell application "iTerm"
+                create window with default profile
+                tell current session of current window
+                    write text "{command}"
+                end tell
+            end tell
+            '''
+        else:
+            command = 'cd ' + os.path.join(self.notesPath, self.courseList[courseId].dir) + ' && vim ' + fileName
+            apple_script = f'''
+            tell application "iTerm"
+                create window with default profile
+                tell current session of current window
+                    write text "{command}"
+                    delay 1
+                    write text ":VimtexCompile"
+                end tell
+            end tell
+            '''
+
+        subprocess.run(["osascript", "-e", apple_script])
+
+    # New lecture note functions
+    def currentWrapperCreateLectureNote(self, sender):
+        self.createLectureNote(None, self.currentCourseId)
+
+    def upcomingWrapperCreateLectureNote(self, sender):
+        self.createLectureNote(None, self.upcomingCourseId)
+
+    def createLectureNote(self, sender, courseId = None):
+        if courseId == None:
+            for i in range(1,len(self.courseList)):
+                    if sender.title == self.courseList[str(i)].name:
+                        courseId = str(i)
+                        break
+        directory = Path(os.path.join(self.notesPath, self.courseList[courseId].dir)).expanduser()
+        files = [f.name for f in directory.iterdir() if f.is_file() and f.suffix == '.tex']
+        numbers = []
+        for file in files:
+            numbers += re.findall(r'\d+', file)
+        if len(numbers) > 0:
+            numbers.sort()
+            num = int(numbers[-1]) + 1
+        else:
+            num = 1
+        fileName = "les_" + str(num) + ".tex"
+        self.openingCourseNote(courseId, fileName)
+
+        # Add input to master.tex if exists
+        commentMarker = "% end lessons"
+        if 'master.tex' in files:
+            masterTexPath = directory.joinpath("master.tex")
+            with open(masterTexPath, 'r') as f:
+                lines = f.readlines()
+
+            modified_lines = []
+            lineToAdd = "\input{" + fileName + "}" + "\n"
+
+            # Check if not already in file
+            if len([line for line in lines if lineToAdd in line]) == 0:
+                for line in lines:
+                    if commentMarker in line:
+                        modified_lines.append(lineToAdd)
+                    modified_lines.append(line)
+
+                # Write the modified file
+                with open(masterTexPath, 'w') as f:
+                    f.writelines(modified_lines)
+
+
+    # Opening timetable 
+    def openTimetable(self, sender):
+        if os.path.isfile('timetable.pdf'):
+            print("Opening timetable")
+            # Open pdf in the browser
+            webbrowser.open_new(r'file://' + os.path.abspath('timetable.pdf'))
+
+    # Opening config
+    def openSettings(self, sender):
+        print("Opening settings")
+        # Open default editor for .json
+        subprocess.call(('open', self.configPath))
+
+        # Open finder to folder
+        subprocess.call(["open", "-R", 'timetable.pdf'])
+
 
 
 if __name__ == '__main__':
